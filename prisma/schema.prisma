@@ -1,0 +1,309 @@
+// S27 Events — data model
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  CREATOR
+  ADMIN
+}
+
+enum CreatorStatus {
+  NONE
+  PENDING
+  APPROVED
+  REVOKED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum TicketStatus {
+  VALID
+  CHECKED_IN
+  CANCELLED
+  REFUNDED
+  TRANSFERRED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum ScanResult {
+  VALID
+  ALREADY_USED
+  INVALID
+  CANCELLED
+  WRONG_EVENT
+  REVERSED
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String
+  passwordHash  String
+  role          Role          @default(CUSTOMER)
+  creatorStatus CreatorStatus @default(NONE)
+  phone         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  events         Event[]           @relation("EventCreator")
+  orders         Order[]
+  tickets        Ticket[]          @relation("TicketHolder")
+  staffFor       StaffAssignment[]
+  scansPerformed CheckInLog[]      @relation("Scanner")
+  auditActions   AuditLog[]        @relation("Actor")
+
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  slug          String      @unique
+  title         String
+  category      String
+  description   String
+  coverImage    String
+  venueName     String
+  address       String
+  mapUrl        String?
+  startsAt      DateTime
+  endsAt        DateTime
+  status        EventStatus @default(DRAFT)
+  capacity      Int
+  ageRequirement String?
+  refundPolicy  String
+  transfersAllowed Boolean  @default(true)
+  refundsAllowed   Boolean  @default(true)
+  featured      Boolean     @default(false)
+  isDemo        Boolean     @default(true)
+
+  creatorId String
+  creator   User   @relation("EventCreator", fields: [creatorId], references: [id])
+
+  tiers      TicketTier[]
+  orders     Order[]
+  tickets    Ticket[]
+  promoCodes PromoCode[]
+  staff      StaffAssignment[]
+  checkIns   CheckInLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([startsAt])
+  @@index([creatorId])
+}
+
+model TicketTier {
+  id            String   @id @default(cuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  priceCents    Int
+  quantity      Int      // total allotment
+  sold          Int      @default(0)
+  purchaseLimit Int      @default(8)
+  salesStart    DateTime?
+  salesEnd      DateTime?
+  sortOrder     Int      @default(0)
+
+  orderItems OrderItem[]
+  tickets    Ticket[]
+
+  @@index([eventId])
+}
+
+model PromoCode {
+  id           String       @id @default(cuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  code         String
+  discountType DiscountType
+  amount       Int          // percent (0-100) or cents
+  maxUses      Int?
+  uses         Int          @default(0)
+  active       Boolean      @default(true)
+  orders       Order[]
+
+  @@unique([eventId, code])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  eventId        String
+  event          Event       @relation(fields: [eventId], references: [id])
+  status         OrderStatus @default(PENDING)
+  subtotalCents  Int
+  feeCents       Int         @default(0)
+  discountCents  Int         @default(0)
+  totalCents     Int
+  promoCodeId    String?
+  promoCode      PromoCode?  @relation(fields: [promoCodeId], references: [id])
+  isComplimentary Boolean    @default(false)
+
+  // Payment provider linkage (never store card data)
+  paymentIntentId String?
+  paymentRef      String?
+  paidAt          DateTime?
+  refundedAt      DateTime?
+
+  items   OrderItem[]
+  tickets Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String     @id @default(cuid())
+  orderId        String
+  order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tierId         String
+  tier           TicketTier @relation(fields: [tierId], references: [id])
+  quantity       Int
+  unitPriceCents Int
+
+  @@index([orderId])
+}
+
+model Ticket {
+  id         String       @id @default(cuid())
+  code       String       @unique // human-friendly ticket ID, e.g. S27-XXXX
+  qrToken    String       @unique // secure, unpredictable; never contains PII
+  status     TicketStatus @default(VALID)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id])
+  tierId  String
+  tier    TicketTier @relation(fields: [tierId], references: [id])
+  userId  String
+  user    User   @relation("TicketHolder", fields: [userId], references: [id])
+
+  checkedInAt DateTime?
+  checkedInBy String?
+  entrance    String?
+
+  transferredFromEmail String?
+  transferredAt        DateTime?
+
+  checkIns  CheckInLog[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+}
+
+model StaffAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  canReverse Boolean @default(false) // supervisor: may reverse check-ins
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
+model CheckInLog {
+  id        String     @id @default(cuid())
+  ticketId  String?
+  ticket    Ticket?    @relation(fields: [ticketId], references: [id])
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id])
+  scannerId String
+  scanner   User       @relation("Scanner", fields: [scannerId], references: [id])
+  result    ScanResult
+  entrance  String?
+  device    String?
+  scannedToken String?
+  createdAt DateTime   @default(now())
+
+  @@index([eventId])
+  @@index([ticketId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("Actor", fields: [actorId], references: [id])
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+}
+
+model PlatformSetting {
+  id             String   @id @default("singleton")
+  platformFeeBps Int      @default(300)  // 3.00% platform fee, basis points
+  processingFeeFixedCents Int @default(89) // fixed per-order processing fee
+  processingFeeBps Int    @default(290)  // 2.90% processing
+  updatedAt      DateTime @updatedAt
+}
