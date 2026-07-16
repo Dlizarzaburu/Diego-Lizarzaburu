@@ -10,6 +10,10 @@ import {
   getNextEvent,
 } from "@/server/events";
 
+// Render on each request (reads live event data from the database) instead of
+// being prerendered at build time, so the build never needs the database.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [events, featured, next] = await Promise.all([
     getPublishedEvents(),
