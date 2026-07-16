@@ -19,6 +19,7 @@ export type CheckoutTier = {
   remaining: number;
   purchaseLimit: number;
   onSale: boolean;
+  requiresPassword: boolean;
 };
 
 export function CheckoutPanel({
@@ -27,15 +28,23 @@ export function CheckoutPanel({
   isAuthenticated,
   fees = DEFAULT_FEES,
   loginHref,
+  commissionPerTicketCents = 0,
+  consentRequirement = "NONE",
+  consentFormUrl,
 }: {
   eventId: string;
   tiers: CheckoutTier[];
   isAuthenticated: boolean;
   fees?: FeeConfig;
   loginHref: string;
+  commissionPerTicketCents?: number;
+  consentRequirement?: "NONE" | "UNDERAGE" | "ALL";
+  consentFormUrl?: string | null;
 }) {
   const router = useRouter();
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [passwords, setPasswords] = useState<Record<string, string>>({});
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,9 +63,9 @@ export function CheckoutPanel({
           unitPriceCents: l.tier.priceCents,
           quantity: l.quantity,
         })),
-        { fees },
+        { fees, commissionPerTicketCents },
       ),
-    [lines, fees],
+    [lines, fees, commissionPerTicketCents],
   );
 
   const totalCount = lines.reduce((s, l) => s + l.quantity, 0);
@@ -66,10 +75,16 @@ export function CheckoutPanel({
     setQty((q) => ({ ...q, [id]: clamped }));
   }
 
+  const consentNeeded = consentRequirement !== "NONE";
+
   async function checkout() {
     setError("");
     if (totalCount === 0) {
       setError("Select at least one ticket.");
+      return;
+    }
+    if (consentNeeded && !consentAccepted) {
+      setError("Please review and accept the consent form to continue.");
       return;
     }
     setLoading(true);
@@ -80,9 +95,11 @@ export function CheckoutPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventId,
+          consentAccepted,
           items: lines.map((l) => ({
             tierId: l.tier.id,
             quantity: l.quantity,
+            password: passwords[l.tier.id] ?? "",
           })),
         }),
       });
@@ -196,6 +213,40 @@ export function CheckoutPanel({
                   </div>
                 </div>
               )}
+
+              {!disabled && t.requiresPassword && n > 0 && (
+                <div className="mt-3">
+                  <label className="mb-1 flex items-center gap-1.5 text-xs text-slate-400">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <rect
+                        x="5"
+                        y="11"
+                        width="14"
+                        height="9"
+                        rx="2"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
+                      <path
+                        d="M8 11V8a4 4 0 118 0v3"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                    Private tier — enter access password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwords[t.id] ?? ""}
+                    onChange={(e) =>
+                      setPasswords((p) => ({ ...p, [t.id]: e.target.value }))
+                    }
+                    className="input !py-2 !text-sm"
+                    placeholder="Access password"
+                    autoComplete="off"
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -205,6 +256,13 @@ export function CheckoutPanel({
       {totalCount > 0 && (
         <div className="mt-5 space-y-1.5 border-t border-white/10 pt-4 text-sm">
           <Row label="Subtotal" value={formatMoney(totals.subtotalCents)} />
+          {totals.commissionCents > 0 && (
+            <Row
+              label="Organizer fee"
+              value={formatMoney(totals.commissionCents)}
+              muted
+            />
+          )}
           <Row
             label="Service & processing fees"
             value={formatMoney(totals.feeCents)}
@@ -216,6 +274,41 @@ export function CheckoutPanel({
           </div>
         </div>
       )}
+
+      {/* Consent form acknowledgement */}
+      {consentNeeded && totalCount > 0 && (
+        <label className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-slate-300">
+          <input
+            type="checkbox"
+            checked={consentAccepted}
+            onChange={(e) => setConsentAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0"
+          />
+          <span>
+            {consentRequirement === "UNDERAGE"
+              ? "I confirm that any underage attendee has a signed consent form, and I accept the event's consent terms."
+              : "I have read and accept the event's consent form."}
+            {consentFormUrl && (
+              <>
+                {" "}
+                <a
+                  href={consentFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-300 underline"
+                >
+                  View consent form
+                </a>
+              </>
+            )}
+          </span>
+        </label>
+      )}
+
+      {/* Non-refundable notice */}
+      <p className="mt-3 text-center text-[11px] text-slate-500">
+        All ticket sales are final and non-refundable.
+      </p>
 
       {error && (
         <div className="mt-4">

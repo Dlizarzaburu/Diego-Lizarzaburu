@@ -14,6 +14,9 @@ export type TicketView = {
   venueName: string;
   holderName: string;
   transfersAllowed: boolean;
+  refundsAllowed: boolean;
+  accentColor?: string | null;
+  ticketNote?: string | null;
 };
 
 const statusStyles: Record<string, string> = {
@@ -32,6 +35,8 @@ export function TicketCard({
   onTransfer?: (ticket: TicketView) => void;
 }) {
   const [flipped, setFlipped] = useState(false);
+  const [walletMsg, setWalletMsg] = useState("");
+  const accent = ticket.accentColor || "#8b5cf6";
 
   function download() {
     const link = document.createElement("a");
@@ -40,8 +45,29 @@ export function TicketCard({
     link.click();
   }
 
+  async function addToWallet() {
+    setWalletMsg("");
+    const res = await fetch(`/api/tickets/${ticket.id}/wallet`);
+    if (res.ok) {
+      // A signed .pkpass is returned when Apple Wallet is configured.
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${ticket.code}.pkpass`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setWalletMsg(data.error ?? "Apple Wallet isn't available yet.");
+    }
+  }
+
   return (
-    <div className="glass-strong overflow-hidden">
+    <div
+      className="glass-strong overflow-hidden border-t-2"
+      style={{ borderTopColor: accent }}
+    >
       <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
         {/* QR */}
         <div className="relative shrink-0">
@@ -64,6 +90,18 @@ export function TicketCard({
 
         {/* Details */}
         <div className="min-w-0 flex-1">
+          {/* Brand line — the S27 Events logo always stays on the ticket */}
+          <div className="mb-1 flex items-center gap-1.5">
+            <span
+              className="grid h-5 w-5 place-items-center rounded-md text-[9px] font-black text-white"
+              style={{ background: accent }}
+            >
+              S27
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              S27 Events
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <h3 className="truncate text-lg font-bold text-white">
               {ticket.eventTitle}
@@ -79,14 +117,34 @@ export function TicketCard({
             >
               {ticket.status.replace("_", " ")}
             </span>
+            {!ticket.refundsAllowed && (
+              <span className="chip border-ember/40 text-ember-warm">
+                Non-refundable
+              </span>
+            )}
+            {!ticket.transfersAllowed && (
+              <span className="chip border-white/15 text-slate-300">
+                No resale / transfer
+              </span>
+            )}
           </div>
-          <p className="mt-2 font-mono text-xs text-violetx-bright">
+          {ticket.ticketNote && (
+            <p className="mt-1.5 text-xs text-slate-400">{ticket.ticketNote}</p>
+          )}
+          <p className="mt-2 font-mono text-xs" style={{ color: accent }}>
             {ticket.code}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={download} className="btn-secondary !py-2 !text-xs">
               Download QR
+            </button>
+            <button
+              onClick={addToWallet}
+              className="btn-ghost !py-2 !text-xs"
+              title="Add to Apple Wallet"
+            >
+              Add to Apple Wallet
             </button>
             <button
               onClick={() => setFlipped((f) => !f)}
@@ -105,6 +163,9 @@ export function TicketCard({
                 </button>
               )}
           </div>
+          {walletMsg && (
+            <p className="mt-2 text-xs text-amber-300">{walletMsg}</p>
+          )}
         </div>
       </div>
 

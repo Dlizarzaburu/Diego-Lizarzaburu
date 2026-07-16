@@ -35,14 +35,45 @@ export function Hero({
         />
         <div className="absolute inset-0 bg-gradient-to-b from-ink-950/70 via-ink-950/85 to-ink-950" />
         <div className="absolute inset-0 bg-grid-glow" />
+        {/* Halloween-season ember glow */}
+        <div
+          className="absolute inset-0 opacity-70"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 85% 15%, rgba(244,63,94,0.22), transparent 40%), radial-gradient(circle at 10% 80%, rgba(251,146,60,0.16), transparent 45%)",
+          }}
+        />
       </div>
       <div className="aurora" />
 
+      {/* Floating party lights (disabled under reduced motion) */}
+      {!reduce && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {["🎃", "✨", "🦇", "🎶", "👻", "✨"].map((e, i) => (
+            <span
+              key={i}
+              className="absolute animate-float select-none text-2xl opacity-20"
+              style={{
+                left: `${8 + i * 16}%`,
+                top: `${15 + ((i * 13) % 60)}%`,
+                animationDelay: `${i * 0.9}s`,
+                animationDuration: `${6 + i}s`,
+              }}
+            >
+              {e}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="container-x relative z-10 py-28">
-        <motion.div {...rise(0)}>
+        <motion.div {...rise(0)} className="flex flex-wrap gap-2">
           <span className="chip border-violetx/40 bg-violetx/10 text-violetx-bright">
             <span className="h-1.5 w-1.5 animate-pulse-glow rounded-full bg-violetx" />
             The official Senior 2027 ticketing platform
+          </span>
+          <span className="chip border-ember/40 bg-ember/10 text-ember-warm">
+            🎃 Halloween season is here
           </span>
         </motion.div>
 

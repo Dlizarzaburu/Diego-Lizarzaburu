@@ -30,6 +30,9 @@ export default async function TicketsPage() {
       venueName: t.event.venueName,
       holderName: user.name,
       transfersAllowed: t.event.transfersAllowed,
+      refundsAllowed: t.event.refundsAllowed,
+      accentColor: t.event.ticketAccentColor,
+      ticketNote: t.event.ticketNote,
       startsMs: t.event.startsAt.getTime(),
     })),
   );

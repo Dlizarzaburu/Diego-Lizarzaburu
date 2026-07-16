@@ -16,11 +16,13 @@ export function AccountNav({
   email,
   role,
   creatorStatus,
+  isScanner = false,
 }: {
   name: string;
   email: string;
   role: Role;
   creatorStatus: CreatorStatus;
+  isScanner?: boolean;
 }) {
   const pathname = usePathname();
   return (
@@ -71,6 +73,22 @@ export function AccountNav({
             className="whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium text-violetx-bright hover:bg-white/5"
           >
             Admin Dashboard
+          </Link>
+        )}
+        {isScanner && (
+          <Link
+            href="/scanner"
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium text-neon-bright hover:bg-white/5"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3m12-4v3a1 1 0 01-1 1h-3M3 12h18"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+            Entrance Scanner
           </Link>
         )}
         {role === "CUSTOMER" && creatorStatus === "NONE" && (

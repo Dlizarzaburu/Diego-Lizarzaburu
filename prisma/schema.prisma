@@ -59,6 +59,12 @@ enum ScanResult {
   REVERSED
 }
 
+enum ConsentRequirement {
+  NONE
+  UNDERAGE
+  ALL
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -122,9 +128,20 @@ model Event {
   ageRequirement String?
   refundPolicy  String
   transfersAllowed Boolean  @default(true)
-  refundsAllowed   Boolean  @default(true)
+  refundsAllowed   Boolean  @default(false)
   featured      Boolean     @default(false)
   isDemo        Boolean     @default(true)
+
+  // Optional organizer commission fee added per ticket (cents).
+  commissionFeeCents Int @default(0)
+
+  // Consent form: require attendees to agree to an uploaded form.
+  consentRequirement ConsentRequirement @default(NONE)
+  consentFormUrl     String?
+
+  // Ticket appearance customization (the S27 logo always remains).
+  ticketAccentColor String?
+  ticketNote        String?
 
   creatorId String
   creator   User   @relation("EventCreator", fields: [creatorId], references: [id])
@@ -157,6 +174,8 @@ model TicketTier {
   salesStart    DateTime?
   salesEnd      DateTime?
   sortOrder     Int      @default(0)
+  // Optional access password for a private/hidden tier.
+  password      String?
 
   orderItems OrderItem[]
   tickets    Ticket[]
@@ -199,6 +218,7 @@ model Order {
   paymentRef      String?
   paidAt          DateTime?
   refundedAt      DateTime?
+  consentAcceptedAt DateTime?
 
   items   OrderItem[]
   tickets Ticket[]

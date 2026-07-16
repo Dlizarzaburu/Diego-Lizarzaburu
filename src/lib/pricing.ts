@@ -48,6 +48,7 @@ export function computeFees(
 export type OrderTotals = {
   subtotalCents: number;
   discountCents: number;
+  commissionCents: number;
   feeCents: number;
   totalCents: number;
 };
@@ -58,12 +59,24 @@ export function computeOrderTotals(
     promo?: { discountType: DiscountType; amount: number } | null;
     fees?: FeeConfig;
     complimentary?: boolean;
+    // Optional organizer commission, charged per ticket.
+    commissionPerTicketCents?: number;
   } = {},
 ): OrderTotals {
   const subtotalCents = computeSubtotal(lines);
   const discountCents = computeDiscount(subtotalCents, opts.promo);
+  const ticketCount = lines.reduce((s, l) => s + l.quantity, 0);
+  const commissionCents = opts.complimentary
+    ? 0
+    : (opts.commissionPerTicketCents ?? 0) * ticketCount;
   const net = subtotalCents - discountCents;
   const feeCents = opts.complimentary ? 0 : computeFees(net, opts.fees);
-  const totalCents = opts.complimentary ? 0 : net + feeCents;
-  return { subtotalCents, discountCents, feeCents, totalCents };
+  const totalCents = opts.complimentary ? 0 : net + commissionCents + feeCents;
+  return {
+    subtotalCents,
+    discountCents,
+    commissionCents,
+    feeCents,
+    totalCents,
+  };
 }

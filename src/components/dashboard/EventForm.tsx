@@ -11,6 +11,7 @@ type TierState = {
   price: string; // dollars
   quantity: string;
   purchaseLimit: string;
+  password: string;
 };
 
 export type EventFormValues = {
@@ -29,6 +30,11 @@ export type EventFormValues = {
   refundPolicy: string;
   transfersAllowed: boolean;
   refundsAllowed: boolean;
+  commissionFee: string; // dollars per ticket
+  consentRequirement: "NONE" | "UNDERAGE" | "ALL";
+  consentFormUrl: string;
+  ticketAccentColor: string;
+  ticketNote: string;
   tiers: TierState[];
 };
 
@@ -45,9 +51,14 @@ const empty: EventFormValues = {
   endsAt: "",
   capacity: "200",
   ageRequirement: "",
-  refundPolicy: "Refunds available up to 7 days before the event.",
-  transfersAllowed: true,
-  refundsAllowed: true,
+  refundPolicy: "All ticket sales are final and non-refundable.",
+  transfersAllowed: false,
+  refundsAllowed: false,
+  commissionFee: "0",
+  consentRequirement: "NONE",
+  consentFormUrl: "",
+  ticketAccentColor: "#8b5cf6",
+  ticketNote: "",
   tiers: [
     {
       name: "General Admission",
@@ -55,6 +66,7 @@ const empty: EventFormValues = {
       price: "25",
       quantity: "100",
       purchaseLimit: "8",
+      password: "",
     },
   ],
 };
@@ -94,6 +106,7 @@ export function EventForm({
           price: "0",
           quantity: "50",
           purchaseLimit: "8",
+          password: "",
         },
       ],
     }));
@@ -122,6 +135,11 @@ export function EventForm({
       refundPolicy: v.refundPolicy,
       transfersAllowed: v.transfersAllowed,
       refundsAllowed: v.refundsAllowed,
+      commissionFeeCents: Math.round(Number(v.commissionFee || "0") * 100),
+      consentRequirement: v.consentRequirement,
+      consentFormUrl: v.consentFormUrl || undefined,
+      ticketAccentColor: v.ticketAccentColor || undefined,
+      ticketNote: v.ticketNote || undefined,
       tiers: v.tiers.map((t) => ({
         id: t.id,
         name: t.name,
@@ -129,6 +147,7 @@ export function EventForm({
         priceCents: Math.round(Number(t.price) * 100),
         quantity: Number(t.quantity),
         purchaseLimit: Number(t.purchaseLimit),
+        password: t.password || undefined,
       })),
     };
 
@@ -349,6 +368,15 @@ export function EventForm({
                   onChange={(e) => setTier(i, { description: e.target.value })}
                 />
               </Field>
+              <Field label="Tier password (optional — hides this tier behind a password)">
+                <input
+                  className="input"
+                  value={t.password}
+                  onChange={(e) => setTier(i, { password: e.target.value })}
+                  placeholder="Leave blank for a public tier"
+                  autoComplete="off"
+                />
+              </Field>
             </div>
           ))}
         </div>
@@ -359,6 +387,78 @@ export function EventForm({
         >
           + Add tier
         </button>
+      </Section>
+
+      <Section title="Fees, consent & ticket style">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Organizer commission per ticket (USD, optional)">
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="input"
+              value={v.commissionFee}
+              onChange={(e) => set("commissionFee", e.target.value)}
+              placeholder="0.00"
+            />
+          </Field>
+          <Field label="Consent form requirement">
+            <select
+              className="input"
+              value={v.consentRequirement}
+              onChange={(e) =>
+                set(
+                  "consentRequirement",
+                  e.target.value as EventFormValues["consentRequirement"],
+                )
+              }
+            >
+              <option value="NONE">Not required</option>
+              <option value="UNDERAGE">Required for underage attendees</option>
+              <option value="ALL">Required for everyone</option>
+            </select>
+          </Field>
+        </div>
+        {v.consentRequirement !== "NONE" && (
+          <Field label="Consent form link (upload a PDF/doc somewhere and paste its URL)">
+            <input
+              className="input"
+              value={v.consentFormUrl}
+              onChange={(e) => set("consentFormUrl", e.target.value)}
+              placeholder="https://…/consent-form.pdf"
+            />
+          </Field>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Ticket accent color">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-14 rounded-lg border border-white/10 bg-transparent"
+                value={v.ticketAccentColor || "#8b5cf6"}
+                onChange={(e) => set("ticketAccentColor", e.target.value)}
+              />
+              <input
+                className="input"
+                value={v.ticketAccentColor}
+                onChange={(e) => set("ticketAccentColor", e.target.value)}
+                placeholder="#8b5cf6"
+              />
+            </div>
+          </Field>
+          <Field label="Ticket note (optional — shown on the ticket)">
+            <input
+              className="input"
+              value={v.ticketNote}
+              onChange={(e) => set("ticketNote", e.target.value)}
+              placeholder="e.g. Doors at 8pm · ID required"
+            />
+          </Field>
+        </div>
+        <p className="text-xs text-slate-500">
+          The S27 Events logo always appears on every ticket. Your accent color
+          and note personalize it.
+        </p>
       </Section>
 
       <Section title="Policies">

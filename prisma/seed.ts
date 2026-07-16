@@ -361,6 +361,24 @@ async function main() {
     },
   });
 
+  // Demo the new features on the featured (Halloween) event: an orange ticket
+  // accent + note, a small organizer commission, and a password-gated tier.
+  await prisma.event.update({
+    where: { id: createdEvents[0].id },
+    data: {
+      ticketAccentColor: "#f97316",
+      ticketNote: "Doors 8pm · 16+ with student ID · Costumes encouraged 🎃",
+      commissionFeeCents: 100,
+    },
+  });
+  const vipTier = createdEvents[0].tiers.find((t) => t.name === "VIP Lounge");
+  if (vipTier) {
+    await prisma.ticketTier.update({
+      where: { id: vipTier.id },
+      data: { password: "vip2027" },
+    });
+  }
+
   // Staff assignment + supervisor for the featured event (scanner access).
   await prisma.staffAssignment.create({
     data: { userId: staff.id, eventId: createdEvents[0].id, canReverse: false },

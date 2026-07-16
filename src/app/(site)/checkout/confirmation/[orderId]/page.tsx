@@ -41,6 +41,9 @@ export default async function ConfirmationPage({
       venueName: order.event.venueName,
       holderName: user.name,
       transfersAllowed: order.event.transfersAllowed,
+      refundsAllowed: order.event.refundsAllowed,
+      accentColor: order.event.ticketAccentColor,
+      ticketNote: order.event.ticketNote,
     })),
   );
 

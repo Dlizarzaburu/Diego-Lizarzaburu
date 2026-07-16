@@ -1,6 +1,7 @@
 import { Hero } from "@/components/home/Hero";
 import { FeaturedEvent } from "@/components/home/FeaturedEvent";
 import { HowItWorks } from "@/components/home/HowItWorks";
+import { ExecBoard } from "@/components/home/ExecBoard";
 import { EventsExplorer } from "@/components/EventsExplorer";
 import { Reveal } from "@/components/Reveal";
 import Link from "next/link";
@@ -44,6 +45,8 @@ export default async function HomePage() {
       />
 
       <HowItWorks />
+
+      <ExecBoard />
 
       {/* CTA band */}
       <section className="container-x py-16">

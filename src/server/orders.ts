@@ -76,6 +76,17 @@ export async function createPendingOrder(userId: string, input: CheckoutInput) {
     };
   }
 
+  // Consent: if the event requires a signed consent form, the customer must
+  // acknowledge it before an order can be created.
+  if (event.consentRequirement !== "NONE" && !input.consentAccepted) {
+    throw new OrderError(
+      "CONSENT_REQUIRED",
+      event.consentRequirement === "UNDERAGE"
+        ? "This event requires a consent form for underage attendees. Please review and accept it."
+        : "This event requires you to accept the consent form.",
+    );
+  }
+
   const order = await prisma.$transaction(async (tx) => {
     const lines: {
       tierId: string;
@@ -86,6 +97,15 @@ export async function createPendingOrder(userId: string, input: CheckoutInput) {
     for (const item of input.items) {
       const tier = event.tiers.find((t) => t.id === item.tierId);
       if (!tier) throw new OrderError("TIER_INVALID", "Invalid ticket tier.");
+
+      // Private tier password gate.
+      if (tier.password && tier.password.length > 0) {
+        if ((item.password ?? "") !== tier.password)
+          throw new OrderError(
+            "TIER_PASSWORD",
+            `${tier.name} requires a valid access password.`,
+          );
+      }
 
       if (tier.salesStart && tier.salesStart > now)
         throw new OrderError("NOT_ON_SALE", `${tier.name} is not on sale yet.`);
@@ -119,7 +139,11 @@ export async function createPendingOrder(userId: string, input: CheckoutInput) {
       });
     }
 
-    const totals = computeOrderTotals(lines, { promo, fees });
+    const totals = computeOrderTotals(lines, {
+      promo,
+      fees,
+      commissionPerTicketCents: event.commissionFeeCents,
+    });
 
     return tx.order.create({
       data: {
@@ -128,9 +152,12 @@ export async function createPendingOrder(userId: string, input: CheckoutInput) {
         status: "PENDING",
         subtotalCents: totals.subtotalCents,
         discountCents: totals.discountCents,
-        feeCents: totals.feeCents,
+        // Organizer commission is folded into the order fee total.
+        feeCents: totals.feeCents + totals.commissionCents,
         totalCents: totals.totalCents,
         promoCodeId: promo?.id,
+        consentAcceptedAt:
+          event.consentRequirement !== "NONE" ? new Date() : null,
         items: {
           create: lines.map((l) => ({
             tierId: l.tierId,

@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { requireRole, canManageEvent } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { eventAnalytics } from "@/server/analytics";
@@ -9,16 +8,16 @@ import {
   TierBarChart,
 } from "@/components/dashboard/Charts";
 import {
-  EventActions,
   PromoForm,
   StaffForm,
   CompForm,
 } from "@/components/dashboard/EventManagePanels";
-import { formatMoney, formatDateTime } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function ManageEventPage({
+export default async function EventOverviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -41,22 +40,6 @@ export default async function ManageEventPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link href="/creator" className="text-xs link-muted">
-            ← All events
-          </Link>
-          <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">
-            {event.title}
-          </h1>
-          <p className="text-sm text-slate-400">
-            {formatDateTime(event.startsAt)} · {event.venueName} ·{" "}
-            <span className="uppercase">{event.status}</span>
-          </p>
-        </div>
-        <EventActions eventId={event.id} status={event.status} />
-      </div>
-
       {/* KPI grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -83,26 +66,6 @@ export default async function ManageEventPage({
           accent="emerald"
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Refunds"
-          value={`${a.refundCount}`}
-          sub={formatMoney(a.refundAmountCents)}
-          accent="ember"
-        />
-        <StatCard label="Capacity" value={`${a.capacity}`} accent="blue" />
-        <StatCard
-          label="Upcoming payout"
-          value={formatMoney(a.upcomingPayoutCents)}
-          sub="Net of fees"
-          accent="emerald"
-        />
-        <StatCard
-          label="Active tickets"
-          value={`${a.activeTickets}`}
-          accent="violet"
-        />
-      </div>
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -115,39 +78,6 @@ export default async function ManageEventPage({
           />
         </Panel>
       </div>
-
-      {/* Tier detail table */}
-      <Panel title="Ticket tiers">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
-              <tr>
-                <th className="pb-2">Tier</th>
-                <th className="pb-2">Price</th>
-                <th className="pb-2">Sold</th>
-                <th className="pb-2">Remaining</th>
-                <th className="pb-2">Revenue</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {a.byTier.map((t) => (
-                <tr key={t.name} className="text-slate-200">
-                  <td className="py-2 font-medium">{t.name}</td>
-                  <td className="py-2">
-                    {formatMoney(
-                      event.tiers.find((x) => x.name === t.name)?.priceCents ??
-                        0,
-                    )}
-                  </td>
-                  <td className="py-2">{t.sold}</td>
-                  <td className="py-2">{t.quantity - t.sold}</td>
-                  <td className="py-2">{formatMoney(t.revenueCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
 
       {/* Management panels */}
       <div className="grid gap-6 lg:grid-cols-2">

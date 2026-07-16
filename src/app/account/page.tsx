@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function AccountOverview() {
   const user = await requireUser();
 
-  const [ticketCount, upcoming, orderCount] = await Promise.all([
+  const [ticketCount, upcoming, orderCount, staffCount] = await Promise.all([
     prisma.ticket.count({
       where: { userId: user.id, status: { in: ["VALID", "CHECKED_IN"] } },
     }),
@@ -23,7 +23,10 @@ export default async function AccountOverview() {
       take: 3,
     }),
     prisma.order.count({ where: { userId: user.id, status: "PAID" } }),
+    prisma.staffAssignment.count({ where: { userId: user.id } }),
   ]);
+
+  const isScanner = user.role === "ADMIN" || staffCount > 0;
 
   const stats = [
     { label: "Active tickets", value: ticketCount },
@@ -40,6 +43,35 @@ export default async function AccountOverview() {
         Welcome back, {user.name.split(" ")[0]}
       </h1>
       <p className="mb-8 text-slate-400">Here&apos;s what&apos;s coming up.</p>
+
+      {isScanner && (
+        <Link
+          href="/scanner"
+          className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-neon/30 bg-neon/10 p-5 transition hover:bg-neon/15"
+        >
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-neon/20 text-neon-bright">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3m12-4v3a1 1 0 01-1 1h-3M3 12h18"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-white">
+                You&apos;re event staff — open the scanner
+              </p>
+              <p className="text-sm text-slate-300">
+                Scan tickets at the entrance for your assigned events.
+              </p>
+            </div>
+          </div>
+          <span className="text-neon-bright">→</span>
+        </Link>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map((s) => (

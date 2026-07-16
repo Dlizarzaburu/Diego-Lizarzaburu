@@ -38,6 +38,7 @@ export const tierInputSchema = z.object({
   purchaseLimit: z.number().int().min(1).max(50),
   salesStart: z.string().datetime().optional().nullable(),
   salesEnd: z.string().datetime().optional().nullable(),
+  password: z.string().trim().max(60).optional().or(z.literal("")),
 });
 
 export const eventInputSchema = z.object({
@@ -56,6 +57,16 @@ export const eventInputSchema = z.object({
   transfersAllowed: z.boolean(),
   refundsAllowed: z.boolean(),
   featured: z.boolean().optional(),
+  commissionFeeCents: z.number().int().min(0).max(100_00).optional(),
+  consentRequirement: z.enum(["NONE", "UNDERAGE", "ALL"]).optional(),
+  consentFormUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
+  ticketAccentColor: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #8b5cf6")
+    .optional()
+    .or(z.literal("")),
+  ticketNote: z.string().trim().max(200).optional().or(z.literal("")),
   tiers: z.array(tierInputSchema).min(1, "Add at least one ticket tier"),
 });
 
@@ -66,10 +77,14 @@ export const checkoutSchema = z.object({
       z.object({
         tierId: z.string().min(1),
         quantity: z.number().int().min(1).max(50),
+        // Password for private tiers that require one.
+        password: z.string().trim().max(60).optional().or(z.literal("")),
       }),
     )
     .min(1, "Select at least one ticket"),
   promoCode: z.string().trim().max(40).optional().or(z.literal("")),
+  // Consent acknowledgement when the event requires a signed form.
+  consentAccepted: z.boolean().optional(),
 });
 
 export const confirmPaymentSchema = z.object({

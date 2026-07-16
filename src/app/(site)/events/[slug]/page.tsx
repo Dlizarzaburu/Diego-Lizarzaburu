@@ -56,6 +56,8 @@ export default async function EventDetailPage({
     onSale:
       (!t.salesStart || t.salesStart <= now) &&
       (!t.salesEnd || t.salesEnd >= now),
+    // Never send the password to the client — only whether one is required.
+    requiresPassword: !!(t.password && t.password.length > 0),
   }));
 
   const fees = settings
@@ -185,6 +187,9 @@ export default async function EventDetailPage({
             isAuthenticated={!!user}
             fees={fees}
             loginHref={`/login?next=/events/${event.slug}`}
+            commissionPerTicketCents={event.commissionFeeCents}
+            consentRequirement={event.consentRequirement}
+            consentFormUrl={event.consentFormUrl}
           />
         </aside>
       </div>

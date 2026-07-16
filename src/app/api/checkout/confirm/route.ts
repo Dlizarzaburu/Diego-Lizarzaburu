@@ -9,7 +9,7 @@ import {
   requireApiUser,
 } from "@/lib/api";
 import { verifyDevPayment } from "@/lib/payments";
-import { stripeConfigured } from "@/lib/env";
+import { stripeConfigured, yappyConfigured } from "@/lib/env";
 import { fulfillOrder, sendOrderConfirmation } from "@/server/orders";
 import { audit } from "@/lib/audit";
 
@@ -21,9 +21,9 @@ export const POST = handler(async (req) => {
   const user = await requireApiUser();
   const input = await parseBody(req, confirmPaymentSchema);
 
-  if (stripeConfigured) {
+  if (stripeConfigured || yappyConfigured) {
     return fail(
-      "Live payments are confirmed by the Stripe webhook, not this endpoint.",
+      "Live payments are confirmed by the provider webhook, not this endpoint.",
       400,
     );
   }

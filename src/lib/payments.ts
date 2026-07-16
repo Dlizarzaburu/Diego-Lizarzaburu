@@ -1,6 +1,6 @@
 import "server-only";
 import crypto from "crypto";
-import { env, stripeConfigured } from "./env";
+import { env, stripeConfigured, yappyConfigured } from "./env";
 
 // Payment provider abstraction.
 //
@@ -20,7 +20,7 @@ export type PaymentIntent = {
   id: string;
   clientSecret: string;
   amountCents: number;
-  provider: "dev" | "stripe";
+  provider: "dev" | "stripe" | "yappy";
 };
 
 export async function createPaymentIntent(params: {
@@ -28,6 +28,19 @@ export async function createPaymentIntent(params: {
   orderId: string;
   metadata?: Record<string, string>;
 }): Promise<PaymentIntent> {
+  // YAPPY (Banco General, Panamá) — integration scaffold for the future.
+  // When YAPPY_MERCHANT_ID + YAPPY_SECRET are configured, this branch will call
+  // Yappy's Payments API to create a payment order and return its redirect/
+  // token. Fulfilment happens through Yappy's IPN/webhook (see the webhook
+  // route), mirroring the Stripe flow so tickets are only issued after a
+  // verified payment. Until credentials exist it safely falls through to the
+  // DEV provider below, so checkout keeps working in test mode.
+  if (yappyConfigured) {
+    // TODO: POST to Yappy `/payments` with merchant id + signed body.
+    // const res = await fetch("https://apipagosbg.bgeneral.cloud/payments", {...})
+    // return { id, clientSecret, amountCents, provider: "yappy" };
+  }
+
   if (stripeConfigured) {
     const body = new URLSearchParams({
       amount: String(params.amountCents),
