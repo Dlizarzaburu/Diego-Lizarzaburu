@@ -65,6 +65,11 @@ enum ConsentRequirement {
   ALL
 }
 
+enum CommissionType {
+  FIXED
+  PERCENT
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -132,8 +137,14 @@ model Event {
   featured      Boolean     @default(false)
   isDemo        Boolean     @default(true)
 
-  // Optional organizer commission fee added per ticket (cents).
+  // Optional organizer commission. FIXED = commissionFeeCents per ticket;
+  // PERCENT = commissionPercentBps of the ticket subtotal (basis points).
+  commissionType     CommissionType @default(FIXED)
   commissionFeeCents Int @default(0)
+  commissionPercentBps Int @default(0)
+
+  // Hide the remaining-ticket counts from customers.
+  hideRemaining Boolean @default(false)
 
   // Consent form: require attendees to agree to an uploaded form.
   consentRequirement ConsentRequirement @default(NONE)
@@ -176,6 +187,8 @@ model TicketTier {
   sortOrder     Int      @default(0)
   // Optional access password for a private/hidden tier.
   password      String?
+  // Creator-chosen color shown to staff on the scanner result for this tier.
+  color         String?
 
   orderItems OrderItem[]
   tickets    Ticket[]

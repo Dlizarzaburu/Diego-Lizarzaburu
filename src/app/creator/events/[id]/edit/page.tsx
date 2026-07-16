@@ -44,7 +44,10 @@ export default async function EditEventPage({
     refundPolicy: event.refundPolicy,
     transfersAllowed: event.transfersAllowed,
     refundsAllowed: event.refundsAllowed,
+    commissionType: event.commissionType,
     commissionFee: (event.commissionFeeCents / 100).toString(),
+    commissionPercent: (event.commissionPercentBps / 100).toString(),
+    hideRemaining: event.hideRemaining,
     consentRequirement: event.consentRequirement,
     consentFormUrl: event.consentFormUrl ?? "",
     ticketAccentColor: event.ticketAccentColor ?? "#8b5cf6",
@@ -57,6 +60,7 @@ export default async function EditEventPage({
       quantity: String(t.quantity),
       purchaseLimit: String(t.purchaseLimit),
       password: t.password ?? "",
+      color: t.color ?? "#3b82f6",
     })),
   };
 

@@ -9,6 +9,7 @@ export type ScanOutcome = {
   ticket?: {
     code: string;
     tierName: string;
+    tierColor: string | null;
     holderName: string;
     status: string;
   };
@@ -74,6 +75,7 @@ export async function scanTicket(params: {
       ticket: {
         code: ticket.code,
         tierName: ticket.tier.name,
+        tierColor: ticket.tier.color,
         holderName: ticket.user.name,
         status: ticket.status,
       },
@@ -106,6 +108,7 @@ export async function scanTicket(params: {
     ticket: {
       code: ticket.code,
       tierName: ticket.tier.name,
+      tierColor: ticket.tier.color,
       holderName: ticket.user.name,
       status: "CHECKED_IN",
     },

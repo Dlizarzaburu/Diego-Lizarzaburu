@@ -9,6 +9,7 @@ import {
   computeOrderTotals,
   DEFAULT_FEES,
   type FeeConfig,
+  type CommissionSpec,
 } from "@/lib/pricing";
 
 export type CheckoutTier = {
@@ -28,18 +29,20 @@ export function CheckoutPanel({
   isAuthenticated,
   fees = DEFAULT_FEES,
   loginHref,
-  commissionPerTicketCents = 0,
+  commission,
   consentRequirement = "NONE",
   consentFormUrl,
+  hideRemaining = false,
 }: {
   eventId: string;
   tiers: CheckoutTier[];
   isAuthenticated: boolean;
   fees?: FeeConfig;
   loginHref: string;
-  commissionPerTicketCents?: number;
+  commission?: CommissionSpec;
   consentRequirement?: "NONE" | "UNDERAGE" | "ALL";
   consentFormUrl?: string | null;
+  hideRemaining?: boolean;
 }) {
   const router = useRouter();
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -63,9 +66,9 @@ export function CheckoutPanel({
           unitPriceCents: l.tier.priceCents,
           quantity: l.quantity,
         })),
-        { fees, commissionPerTicketCents },
+        { fees, commission },
       ),
-    [lines, fees, commissionPerTicketCents],
+    [lines, fees, commission],
   );
 
   const totalCount = lines.reduce((s, l) => s + l.quantity, 0);
@@ -175,6 +178,8 @@ export function CheckoutPanel({
                     </span>
                   ) : !t.onSale ? (
                     <span className="chip">Not on sale</span>
+                  ) : hideRemaining ? (
+                    <span className="text-xs text-slate-500">Available</span>
                   ) : (
                     <span className="text-xs text-slate-500">
                       {t.remaining} left

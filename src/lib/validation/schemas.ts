@@ -39,6 +39,12 @@ export const tierInputSchema = z.object({
   salesStart: z.string().datetime().optional().nullable(),
   salesEnd: z.string().datetime().optional().nullable(),
   password: z.string().trim().max(60).optional().or(z.literal("")),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #22d3ee")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const eventInputSchema = z.object({
@@ -57,7 +63,10 @@ export const eventInputSchema = z.object({
   transfersAllowed: z.boolean(),
   refundsAllowed: z.boolean(),
   featured: z.boolean().optional(),
+  commissionType: z.enum(["FIXED", "PERCENT"]).optional(),
   commissionFeeCents: z.number().int().min(0).max(100_00).optional(),
+  commissionPercentBps: z.number().int().min(0).max(10000).optional(),
+  hideRemaining: z.boolean().optional(),
   consentRequirement: z.enum(["NONE", "UNDERAGE", "ALL"]).optional(),
   consentFormUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
   ticketAccentColor: z

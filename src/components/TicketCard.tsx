@@ -38,11 +38,16 @@ export function TicketCard({
   const [walletMsg, setWalletMsg] = useState("");
   const accent = ticket.accentColor || "#8b5cf6";
 
-  function download() {
+  function downloadPng() {
     const link = document.createElement("a");
     link.href = ticket.qrDataUrl;
     link.download = `${ticket.code}.png`;
     link.click();
+  }
+
+  function downloadPdf() {
+    // Server builds a branded PDF (QR centered, S27 logo, party details).
+    window.open(`/api/tickets/${ticket.id}/pdf`, "_blank");
   }
 
   async function addToWallet() {
@@ -136,8 +141,14 @@ export function TicketCard({
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={download} className="btn-secondary !py-2 !text-xs">
-              Download QR
+            <button
+              onClick={downloadPdf}
+              className="btn-secondary !py-2 !text-xs"
+            >
+              Download ticket (PDF)
+            </button>
+            <button onClick={downloadPng} className="btn-ghost !py-2 !text-xs">
+              QR image
             </button>
             <button
               onClick={addToWallet}

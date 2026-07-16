@@ -1,22 +1,20 @@
 import { Reveal } from "@/components/Reveal";
+import { BoardAvatar } from "@/components/home/BoardAvatar";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Senior 2027 executive board.
-// Order matches the request. Drop a photo URL into `photo` for each member when
-// you have the images (put files in /public and use e.g. "/board/andrea.jpg").
-// Until then, an elegant gradient monogram is shown.
-//
-// NOTE: The 4th/5th names were interpreted from "Mariana Lucia Lizarzaburu" as
-// two people. Adjust the names/order here freely.
+// Senior 2027 executive board (order matches the request).
+// Photos load from /public/board/<file>. Until those image files exist, an
+// elegant gradient monogram is shown automatically. To add the photos: put
+// andrea.jpg, angelina.jpg, diego.jpg, mariana.jpg, lucia.jpg in public/board/.
 // ─────────────────────────────────────────────────────────────────────────────
-type Member = { name: string; role?: string; photo?: string };
+type Member = { name: string; role?: string; photo: string };
 
 const BOARD: Member[] = [
-  { name: "Andrea Jaen", photo: undefined },
-  { name: "Angelina Calvo", photo: undefined },
-  { name: "Diego Lizarzaburu", photo: undefined },
-  { name: "Mariana Lizarzaburu", photo: undefined },
-  { name: "Lucia Lizarzaburu", photo: undefined },
+  { name: "Andrea Jaen", photo: "/board/andrea.jpg" },
+  { name: "Angelina Calvo", photo: "/board/angelina.jpg" },
+  { name: "Diego Lizarzaburu", photo: "/board/diego.jpg" },
+  { name: "Mariana Diaz", photo: "/board/mariana.jpg" },
+  { name: "Lucia Lizarzaburu", photo: "/board/lucia.jpg" },
 ];
 
 function initials(name: string) {
@@ -51,23 +49,11 @@ export function ExecBoard() {
           {BOARD.map((m, i) => (
             <Reveal key={m.name} delay={i * 0.08}>
               <figure className="group flex w-32 flex-col items-center text-center sm:w-36">
-                <div className="relative">
-                  <div className="absolute -inset-1 rounded-full bg-accent-gradient opacity-60 blur-md transition group-hover:opacity-100" />
-                  <div className="relative h-28 w-28 overflow-hidden rounded-full ring-2 ring-white/20 sm:h-32 sm:w-32">
-                    {m.photo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={m.photo}
-                        alt={m.name}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                      />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-ink-700 to-ink-800 text-2xl font-black text-white">
-                        {initials(m.name)}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <BoardAvatar
+                  name={m.name}
+                  photo={m.photo}
+                  initials={initials(m.name)}
+                />
                 <figcaption className="mt-4 text-sm font-bold text-white">
                   {m.name}
                 </figcaption>

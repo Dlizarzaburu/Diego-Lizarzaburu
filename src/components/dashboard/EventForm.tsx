@@ -12,6 +12,7 @@ type TierState = {
   quantity: string;
   purchaseLimit: string;
   password: string;
+  color: string;
 };
 
 export type EventFormValues = {
@@ -30,7 +31,10 @@ export type EventFormValues = {
   refundPolicy: string;
   transfersAllowed: boolean;
   refundsAllowed: boolean;
-  commissionFee: string; // dollars per ticket
+  commissionType: "FIXED" | "PERCENT";
+  commissionFee: string; // dollars per ticket (when FIXED)
+  commissionPercent: string; // percent (when PERCENT)
+  hideRemaining: boolean;
   consentRequirement: "NONE" | "UNDERAGE" | "ALL";
   consentFormUrl: string;
   ticketAccentColor: string;
@@ -54,7 +58,10 @@ const empty: EventFormValues = {
   refundPolicy: "All ticket sales are final and non-refundable.",
   transfersAllowed: false,
   refundsAllowed: false,
+  commissionType: "FIXED",
   commissionFee: "0",
+  commissionPercent: "0",
+  hideRemaining: false,
   consentRequirement: "NONE",
   consentFormUrl: "",
   ticketAccentColor: "#8b5cf6",
@@ -67,6 +74,7 @@ const empty: EventFormValues = {
       quantity: "100",
       purchaseLimit: "8",
       password: "",
+      color: "#8b5cf6",
     },
   ],
 };
@@ -107,6 +115,7 @@ export function EventForm({
           quantity: "50",
           purchaseLimit: "8",
           password: "",
+          color: "#3b82f6",
         },
       ],
     }));
@@ -135,7 +144,12 @@ export function EventForm({
       refundPolicy: v.refundPolicy,
       transfersAllowed: v.transfersAllowed,
       refundsAllowed: v.refundsAllowed,
+      commissionType: v.commissionType,
       commissionFeeCents: Math.round(Number(v.commissionFee || "0") * 100),
+      commissionPercentBps: Math.round(
+        Number(v.commissionPercent || "0") * 100,
+      ),
+      hideRemaining: v.hideRemaining,
       consentRequirement: v.consentRequirement,
       consentFormUrl: v.consentFormUrl || undefined,
       ticketAccentColor: v.ticketAccentColor || undefined,
@@ -148,6 +162,7 @@ export function EventForm({
         quantity: Number(t.quantity),
         purchaseLimit: Number(t.purchaseLimit),
         password: t.password || undefined,
+        color: t.color || undefined,
       })),
     };
 
@@ -368,15 +383,33 @@ export function EventForm({
                   onChange={(e) => setTier(i, { description: e.target.value })}
                 />
               </Field>
-              <Field label="Tier password (optional — hides this tier behind a password)">
-                <input
-                  className="input"
-                  value={t.password}
-                  onChange={(e) => setTier(i, { password: e.target.value })}
-                  placeholder="Leave blank for a public tier"
-                  autoComplete="off"
-                />
-              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Tier password (optional — hides this tier)">
+                  <input
+                    className="input"
+                    value={t.password}
+                    onChange={(e) => setTier(i, { password: e.target.value })}
+                    placeholder="Leave blank for a public tier"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Scanner color (shown to staff at check-in)">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      className="h-10 w-14 rounded-lg border border-white/10 bg-transparent"
+                      value={t.color || "#3b82f6"}
+                      onChange={(e) => setTier(i, { color: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      value={t.color}
+                      onChange={(e) => setTier(i, { color: e.target.value })}
+                      placeholder="#3b82f6"
+                    />
+                  </div>
+                </Field>
+              </div>
             </div>
           ))}
         </div>
@@ -391,16 +424,44 @@ export function EventForm({
 
       <Section title="Fees, consent & ticket style">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Organizer commission per ticket (USD, optional)">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="input"
-              value={v.commissionFee}
-              onChange={(e) => set("commissionFee", e.target.value)}
-              placeholder="0.00"
-            />
+          <Field label="Organizer commission">
+            <div className="flex gap-2">
+              <select
+                className="input !w-auto"
+                value={v.commissionType}
+                onChange={(e) =>
+                  set(
+                    "commissionType",
+                    e.target.value as EventFormValues["commissionType"],
+                  )
+                }
+              >
+                <option value="FIXED">$ per ticket</option>
+                <option value="PERCENT">% of subtotal</option>
+              </select>
+              {v.commissionType === "FIXED" ? (
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="input"
+                  value={v.commissionFee}
+                  onChange={(e) => set("commissionFee", e.target.value)}
+                  placeholder="0.00"
+                />
+              ) : (
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  className="input"
+                  value={v.commissionPercent}
+                  onChange={(e) => set("commissionPercent", e.target.value)}
+                  placeholder="e.g. 5"
+                />
+              )}
+            </div>
           </Field>
           <Field label="Consent form requirement">
             <select
@@ -481,6 +542,11 @@ export function EventForm({
             label="Allow transfers"
             checked={v.transfersAllowed}
             onChange={(c) => set("transfersAllowed", c)}
+          />
+          <Toggle
+            label="Hide remaining ticket count from customers"
+            checked={v.hideRemaining}
+            onChange={(c) => set("hideRemaining", c)}
           />
         </div>
       </Section>

@@ -375,7 +375,17 @@ async function main() {
   if (vipTier) {
     await prisma.ticketTier.update({
       where: { id: vipTier.id },
-      data: { password: "vip2027" },
+      data: { password: "vip2027", color: "#f43f5e" },
+    });
+  }
+  // Give each Halloween tier a distinct scanner color for the demo.
+  const gaTierDemo = createdEvents[0].tiers.find(
+    (t) => t.name === "General Admission",
+  );
+  if (gaTierDemo) {
+    await prisma.ticketTier.update({
+      where: { id: gaTierDemo.id },
+      data: { color: "#22d3ee" },
     });
   }
 

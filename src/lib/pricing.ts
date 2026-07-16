@@ -53,14 +53,31 @@ export type OrderTotals = {
   totalCents: number;
 };
 
+export type CommissionSpec = {
+  type: "FIXED" | "PERCENT";
+  perTicketCents: number; // used when type === FIXED
+  percentBps: number; // used when type === PERCENT (basis points)
+};
+
+export function computeCommission(
+  spec: CommissionSpec | undefined,
+  subtotalCents: number,
+  ticketCount: number,
+): number {
+  if (!spec) return 0;
+  if (spec.type === "PERCENT")
+    return Math.round((subtotalCents * spec.percentBps) / 10000);
+  return spec.perTicketCents * ticketCount;
+}
+
 export function computeOrderTotals(
   lines: CartLine[],
   opts: {
     promo?: { discountType: DiscountType; amount: number } | null;
     fees?: FeeConfig;
     complimentary?: boolean;
-    // Optional organizer commission, charged per ticket.
-    commissionPerTicketCents?: number;
+    // Optional organizer commission (fixed per ticket or a percentage).
+    commission?: CommissionSpec;
   } = {},
 ): OrderTotals {
   const subtotalCents = computeSubtotal(lines);
@@ -68,7 +85,7 @@ export function computeOrderTotals(
   const ticketCount = lines.reduce((s, l) => s + l.quantity, 0);
   const commissionCents = opts.complimentary
     ? 0
-    : (opts.commissionPerTicketCents ?? 0) * ticketCount;
+    : computeCommission(opts.commission, subtotalCents, ticketCount);
   const net = subtotalCents - discountCents;
   const feeCents = opts.complimentary ? 0 : computeFees(net, opts.fees);
   const totalCents = opts.complimentary ? 0 : net + commissionCents + feeCents;

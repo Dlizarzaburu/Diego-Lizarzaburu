@@ -60,6 +60,9 @@ export default async function EventDetailPage({
     requiresPassword: !!(t.password && t.password.length > 0),
   }));
 
+  // When the creator hides remaining counts, don't leak exact numbers.
+  const hideRemaining = event.hideRemaining;
+
   const fees = settings
     ? {
         platformFeeBps: settings.platformFeeBps,
@@ -146,9 +149,11 @@ export default async function EventDetailPage({
               <InfoCard title="Availability" icon="ticket">
                 {a.soldOut
                   ? "Sold out"
-                  : a.limited
-                    ? `Limited availability — ${a.remaining} remaining`
-                    : `${a.remaining} tickets available`}
+                  : hideRemaining
+                    ? "On sale now"
+                    : a.limited
+                      ? `Limited availability — ${a.remaining} remaining`
+                      : `${a.remaining} tickets available`}
               </InfoCard>
             </section>
           </Reveal>
@@ -187,9 +192,14 @@ export default async function EventDetailPage({
             isAuthenticated={!!user}
             fees={fees}
             loginHref={`/login?next=/events/${event.slug}`}
-            commissionPerTicketCents={event.commissionFeeCents}
+            commission={{
+              type: event.commissionType,
+              perTicketCents: event.commissionFeeCents,
+              percentBps: event.commissionPercentBps,
+            }}
             consentRequirement={event.consentRequirement}
             consentFormUrl={event.consentFormUrl}
+            hideRemaining={hideRemaining}
           />
         </aside>
       </div>

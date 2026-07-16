@@ -142,7 +142,11 @@ export async function createPendingOrder(userId: string, input: CheckoutInput) {
     const totals = computeOrderTotals(lines, {
       promo,
       fees,
-      commissionPerTicketCents: event.commissionFeeCents,
+      commission: {
+        type: event.commissionType,
+        perTicketCents: event.commissionFeeCents,
+        percentBps: event.commissionPercentBps,
+      },
     });
 
     return tx.order.create({
@@ -259,6 +263,29 @@ export async function sendOrderConfirmation(orderId: string) {
     })),
   );
 
+  // Build a PDF ticket per ticket and attach them to the email.
+  const { buildTicketPdf } = await import("@/lib/pdf-ticket");
+  const attachments = await Promise.all(
+    order.tickets.map(async (t) => ({
+      filename: `${t.code}.pdf`,
+      content: await buildTicketPdf({
+        code: t.code,
+        qrToken: t.qrToken,
+        tierName: t.tier.name,
+        eventTitle: order.event.title,
+        eventStartsAt: order.event.startsAt,
+        venueName: order.event.venueName,
+        address: order.event.address,
+        holderName: order.user.name,
+        accentColor: order.event.ticketAccentColor,
+        note: order.event.ticketNote,
+        refundsAllowed: order.event.refundsAllowed,
+        transfersAllowed: order.event.transfersAllowed,
+      }),
+      contentType: "application/pdf",
+    })),
+  );
+
   const { subject, html } = ticketConfirmationEmail({
     name: order.user.name,
     eventTitle: order.event.title,
@@ -268,7 +295,7 @@ export async function sendOrderConfirmation(orderId: string) {
     orderTotalCents: order.totalCents,
     ticketsUrl: `${env.appUrl}/account/tickets`,
   });
-  await sendEmail({ to: order.user.email, subject, html });
+  await sendEmail({ to: order.user.email, subject, html, attachments });
 }
 
 /** Release reserved inventory for an order that will not be paid. */

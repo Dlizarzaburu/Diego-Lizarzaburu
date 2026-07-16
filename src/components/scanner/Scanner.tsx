@@ -10,6 +10,7 @@ type ScanOutcome = {
   ticket?: {
     code: string;
     tierName: string;
+    tierColor?: string | null;
     holderName: string;
     status: string;
   };
@@ -253,8 +254,10 @@ function ResultBanner({
   onDismiss: () => void;
 }) {
   const valid = outcome.result === "VALID";
-  const warn = outcome.result === "ALREADY_USED";
-  const bg = valid ? "bg-emerald-500" : warn ? "bg-amber-500" : "bg-ember";
+  // Already-used tickets are a hard STOP — treat them like an invalid result
+  // (big red X), then show who/when it was used.
+  const used = outcome.result === "ALREADY_USED";
+  const bg = valid ? "bg-emerald-500" : "bg-ember";
 
   async function reverse() {
     if (!outcome.ticket) return;
@@ -275,13 +278,22 @@ function ResultBanner({
 
   return (
     <div
-      className={`mt-4 overflow-hidden rounded-3xl ${bg} p-5 text-white shadow-glow`}
+      className={`mt-4 overflow-hidden rounded-3xl ${bg} text-white shadow-glow`}
       role="status"
     >
-      <div className="flex items-center gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/20">
+      {/* Tier color band (creator-chosen) so staff can tell tiers apart */}
+      {valid && outcome.ticket?.tierColor && (
+        <div
+          className="h-2 w-full"
+          style={{ backgroundColor: outcome.ticket.tierColor }}
+        />
+      )}
+
+      {/* Big result icon */}
+      <div className="flex flex-col items-center px-5 pt-6 text-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-white/20">
           {valid ? (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
               <path
                 d="M5 13l4 4L19 7"
                 stroke="white"
@@ -291,59 +303,70 @@ function ResultBanner({
               />
             </svg>
           ) : (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
               <path
                 d="M6 6l12 12M18 6L6 18"
                 stroke="white"
-                strokeWidth="3"
+                strokeWidth="3.2"
                 strokeLinecap="round"
               />
             </svg>
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xl font-black leading-tight">
-            {valid
-              ? "VALID"
-              : warn
-                ? "ALREADY USED"
-                : outcome.result.replace("_", " ")}
-          </p>
-          <p className="text-sm text-white/90">{outcome.message}</p>
-        </div>
-        <button onClick={onDismiss} className="text-white/70">
-          ✕
-        </button>
+        <p className="mt-3 text-3xl font-black leading-none tracking-tight">
+          {valid
+            ? "VALID"
+            : used
+              ? "ALREADY USED"
+              : outcome.result.replace("_", " ")}
+        </p>
+        <p className="mt-1 text-sm text-white/90">{outcome.message}</p>
       </div>
 
-      {outcome.ticket && (
-        <div className="mt-3 rounded-2xl bg-black/15 p-3 text-sm">
-          <p className="font-semibold">{outcome.ticket.holderName}</p>
-          <p className="text-white/80">
-            {outcome.ticket.tierName} · {outcome.ticket.code}
-          </p>
+      <div className="p-5">
+        {outcome.ticket && (
+          <div className="rounded-2xl bg-black/15 p-3 text-center text-sm">
+            <p className="text-base font-bold">{outcome.ticket.holderName}</p>
+            <p className="text-white/80">
+              {outcome.ticket.tierName} · {outcome.ticket.code}
+            </p>
+          </div>
+        )}
+
+        {used && outcome.previousCheckIn && (
+          <div className="mt-3 rounded-2xl bg-black/25 p-3 text-center">
+            <p className="text-xs uppercase tracking-wide text-white/70">
+              This QR was already used
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {formatDateTime(outcome.previousCheckIn.at)}
+            </p>
+            <p className="text-xs text-white/80">
+              by {outcome.previousCheckIn.by}
+              {outcome.previousCheckIn.entrance
+                ? ` · ${outcome.previousCheckIn.entrance} entrance`
+                : ""}
+            </p>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <button
+            onClick={onDismiss}
+            className="rounded-full bg-white/20 px-5 py-2 text-sm font-semibold"
+          >
+            Next scan
+          </button>
+          {used && canReverse && (
+            <button
+              onClick={reverse}
+              className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold"
+            >
+              Reverse check-in
+            </button>
+          )}
         </div>
-      )}
-
-      {outcome.previousCheckIn && (
-        <p className="mt-2 text-xs text-white/90">
-          Previously scanned {formatDateTime(outcome.previousCheckIn.at)} by{" "}
-          {outcome.previousCheckIn.by}
-          {outcome.previousCheckIn.entrance
-            ? ` at ${outcome.previousCheckIn.entrance}`
-            : ""}
-          .
-        </p>
-      )}
-
-      {warn && canReverse && (
-        <button
-          onClick={reverse}
-          className="mt-3 rounded-full bg-white/20 px-4 py-2 text-xs font-semibold"
-        >
-          Reverse check-in (supervisor)
-        </button>
-      )}
+      </div>
     </div>
   );
 }

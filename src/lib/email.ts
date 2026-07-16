@@ -3,11 +3,18 @@ import fs from "fs";
 import path from "path";
 import { env } from "./env";
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer | Uint8Array; // raw bytes
+  contentType?: string;
+};
+
 export type EmailMessage = {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 };
 
 // Email provider abstraction. Swap the transport by setting EMAIL_MODE.
@@ -27,6 +34,10 @@ export async function sendEmail(msg: EmailMessage): Promise<{ id: string }> {
         subject: msg.subject,
         html: msg.html,
         text: msg.text,
+        attachments: msg.attachments?.map((a) => ({
+          filename: a.filename,
+          content: Buffer.from(a.content).toString("base64"),
+        })),
       }),
     });
     if (!res.ok) throw new Error(`Resend error: ${res.status}`);
@@ -43,9 +54,13 @@ export async function sendEmail(msg: EmailMessage): Promise<{ id: string }> {
     file,
     `<!-- to: ${msg.to} | subject: ${msg.subject} -->\n${msg.html}`,
   );
+  // Persist attachments next to the email so the PDF is inspectable in dev.
+  for (const a of msg.attachments ?? []) {
+    fs.writeFileSync(path.join(dir, `${id}-${a.filename}`), a.content);
+  }
   // eslint-disable-next-line no-console
   console.log(
-    `[email:dev] wrote ${file} (to=${msg.to} subject=${msg.subject})`,
+    `[email:dev] wrote ${file} (to=${msg.to} subject=${msg.subject}, ${msg.attachments?.length ?? 0} attachment(s))`,
   );
   return { id };
 }
