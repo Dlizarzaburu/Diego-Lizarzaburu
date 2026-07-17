@@ -13,6 +13,7 @@ import { audit } from "@/lib/audit";
 const bodySchema = z.object({
   action: z.enum([
     "approveCreator",
+    "declineCreator",
     "revokeCreator",
     "makeAdmin",
     "makeCustomer",
@@ -33,6 +34,10 @@ export const PATCH = route<IdCtx>(async (req, { params }) => {
     approveCreator: {
       role: "CREATOR" as const,
       creatorStatus: "APPROVED" as const,
+    },
+    declineCreator: {
+      role: "CUSTOMER" as const,
+      creatorStatus: "NONE" as const,
     },
     revokeCreator: {
       role: "CUSTOMER" as const,

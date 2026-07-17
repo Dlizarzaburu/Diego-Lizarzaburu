@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
-import type { EventInput } from "@/lib/validation/schemas";
+import type { EventInput, PartialEventInput } from "@/lib/validation/schemas";
+import type { Prisma } from "@prisma/client";
 
 function slugify(s: string) {
   return s
@@ -45,6 +46,7 @@ export async function createEvent(creatorId: string, input: EventInput) {
       commissionFeeCents: input.commissionFeeCents ?? 0,
       commissionPercentBps: input.commissionPercentBps ?? 0,
       hideRemaining: input.hideRemaining ?? false,
+      allowReverseCheckIn: input.allowReverseCheckIn ?? false,
       consentRequirement: input.consentRequirement ?? "NONE",
       consentFormUrl: input.consentFormUrl || null,
       ticketAccentColor: input.ticketAccentColor || null,
@@ -77,10 +79,16 @@ export async function createEvent(creatorId: string, input: EventInput) {
   return event;
 }
 
+/**
+ * Update an event. Accepts a partial input so a creator can edit one section
+ * at a time (details, schedule, ticket tiers, fees, or policies) without
+ * having to resubmit the whole event. Only the fields that are present are
+ * changed; ticket tiers are reconciled only when a `tiers` array is provided.
+ */
 export async function updateEvent(
   eventId: string,
   actorId: string,
-  input: EventInput,
+  input: PartialEventInput,
 ) {
   const existing = await prisma.event.findUnique({
     where: { id: eventId },
@@ -88,75 +96,87 @@ export async function updateEvent(
   });
   if (!existing) throw new Error("Event not found");
 
-  await prisma.$transaction(async (tx) => {
-    await tx.event.update({
-      where: { id: eventId },
-      data: {
-        title: input.title,
-        category: input.category,
-        description: input.description,
-        coverImage: input.coverImage,
-        venueName: input.venueName,
-        address: input.address,
-        mapUrl: input.mapUrl || null,
-        startsAt: new Date(input.startsAt),
-        endsAt: new Date(input.endsAt),
-        capacity: input.capacity,
-        ageRequirement: input.ageRequirement || null,
-        refundPolicy: input.refundPolicy,
-        transfersAllowed: input.transfersAllowed,
-        refundsAllowed: input.refundsAllowed,
-        commissionType: input.commissionType ?? "FIXED",
-        commissionFeeCents: input.commissionFeeCents ?? 0,
-        commissionPercentBps: input.commissionPercentBps ?? 0,
-        hideRemaining: input.hideRemaining ?? false,
-        consentRequirement: input.consentRequirement ?? "NONE",
-        consentFormUrl: input.consentFormUrl || null,
-        ticketAccentColor: input.ticketAccentColor || null,
-        ticketNote: input.ticketNote || null,
-      },
-    });
+  // Build a data object containing only the provided fields.
+  const data: Prisma.EventUpdateInput = {};
+  const has = <K extends keyof PartialEventInput>(k: K) =>
+    input[k] !== undefined;
+  if (has("title")) data.title = input.title;
+  if (has("category")) data.category = input.category;
+  if (has("description")) data.description = input.description;
+  if (has("coverImage")) data.coverImage = input.coverImage;
+  if (has("venueName")) data.venueName = input.venueName;
+  if (has("address")) data.address = input.address;
+  if (has("mapUrl")) data.mapUrl = input.mapUrl || null;
+  if (has("startsAt")) data.startsAt = new Date(input.startsAt!);
+  if (has("endsAt")) data.endsAt = new Date(input.endsAt!);
+  if (has("capacity")) data.capacity = input.capacity;
+  if (has("ageRequirement")) data.ageRequirement = input.ageRequirement || null;
+  if (has("refundPolicy")) data.refundPolicy = input.refundPolicy;
+  if (has("transfersAllowed")) data.transfersAllowed = input.transfersAllowed;
+  if (has("refundsAllowed")) data.refundsAllowed = input.refundsAllowed;
+  if (has("commissionType")) data.commissionType = input.commissionType;
+  if (has("commissionFeeCents"))
+    data.commissionFeeCents = input.commissionFeeCents;
+  if (has("commissionPercentBps"))
+    data.commissionPercentBps = input.commissionPercentBps;
+  if (has("hideRemaining")) data.hideRemaining = input.hideRemaining;
+  if (has("allowReverseCheckIn"))
+    data.allowReverseCheckIn = input.allowReverseCheckIn;
+  if (has("consentRequirement"))
+    data.consentRequirement = input.consentRequirement;
+  if (has("consentFormUrl")) data.consentFormUrl = input.consentFormUrl || null;
+  if (has("ticketAccentColor"))
+    data.ticketAccentColor = input.ticketAccentColor || null;
+  if (has("ticketNote")) data.ticketNote = input.ticketNote || null;
 
-    const keepIds = new Set(input.tiers.filter((t) => t.id).map((t) => t.id!));
-    // Remove tiers that were deleted AND have no tickets sold.
-    for (const tier of existing.tiers) {
-      if (!keepIds.has(tier.id) && tier.sold === 0) {
-        await tx.ticketTier.delete({ where: { id: tier.id } });
-      }
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(data).length > 0) {
+      await tx.event.update({ where: { id: eventId }, data });
     }
-    for (const [i, t] of input.tiers.entries()) {
-      if (t.id && existing.tiers.some((e) => e.id === t.id)) {
-        await tx.ticketTier.update({
-          where: { id: t.id },
-          data: {
-            name: t.name,
-            description: t.description || null,
-            priceCents: t.priceCents,
-            quantity: t.quantity,
-            purchaseLimit: t.purchaseLimit,
-            password: t.password || null,
-            color: t.color || null,
-            salesStart: t.salesStart ? new Date(t.salesStart) : null,
-            salesEnd: t.salesEnd ? new Date(t.salesEnd) : null,
-            sortOrder: i,
-          },
-        });
-      } else {
-        await tx.ticketTier.create({
-          data: {
-            eventId,
-            name: t.name,
-            description: t.description || null,
-            priceCents: t.priceCents,
-            quantity: t.quantity,
-            purchaseLimit: t.purchaseLimit,
-            password: t.password || null,
-            color: t.color || null,
-            salesStart: t.salesStart ? new Date(t.salesStart) : null,
-            salesEnd: t.salesEnd ? new Date(t.salesEnd) : null,
-            sortOrder: i,
-          },
-        });
+
+    if (input.tiers !== undefined) {
+      const tiers = input.tiers;
+      const keepIds = new Set(tiers.filter((t) => t.id).map((t) => t.id!));
+      // Remove tiers that were deleted AND have no tickets sold.
+      for (const tier of existing.tiers) {
+        if (!keepIds.has(tier.id) && tier.sold === 0) {
+          await tx.ticketTier.delete({ where: { id: tier.id } });
+        }
+      }
+      for (const [i, t] of tiers.entries()) {
+        if (t.id && existing.tiers.some((e) => e.id === t.id)) {
+          await tx.ticketTier.update({
+            where: { id: t.id },
+            data: {
+              name: t.name,
+              description: t.description || null,
+              priceCents: t.priceCents,
+              quantity: t.quantity,
+              purchaseLimit: t.purchaseLimit,
+              password: t.password || null,
+              color: t.color || null,
+              salesStart: t.salesStart ? new Date(t.salesStart) : null,
+              salesEnd: t.salesEnd ? new Date(t.salesEnd) : null,
+              sortOrder: i,
+            },
+          });
+        } else {
+          await tx.ticketTier.create({
+            data: {
+              eventId,
+              name: t.name,
+              description: t.description || null,
+              priceCents: t.priceCents,
+              quantity: t.quantity,
+              purchaseLimit: t.purchaseLimit,
+              password: t.password || null,
+              color: t.color || null,
+              salesStart: t.salesStart ? new Date(t.salesStart) : null,
+              salesEnd: t.salesEnd ? new Date(t.salesEnd) : null,
+              sortOrder: i,
+            },
+          });
+        }
       }
     }
   });

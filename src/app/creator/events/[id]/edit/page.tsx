@@ -48,6 +48,7 @@ export default async function EditEventPage({
     commissionFee: (event.commissionFeeCents / 100).toString(),
     commissionPercent: (event.commissionPercentBps / 100).toString(),
     hideRemaining: event.hideRemaining,
+    allowReverseCheckIn: event.allowReverseCheckIn,
     consentRequirement: event.consentRequirement,
     consentFormUrl: event.consentFormUrl ?? "",
     ticketAccentColor: event.ticketAccentColor ?? "#8b5cf6",

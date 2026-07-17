@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Action = "approveCreator" | "revokeCreator" | "makeAdmin" | "makeCustomer";
+type Action =
+  | "approveCreator"
+  | "declineCreator"
+  | "revokeCreator"
+  | "makeAdmin"
+  | "makeCustomer";
 
 export function UserActions({
   userId,
@@ -31,13 +36,22 @@ export function UserActions({
   return (
     <div className="flex flex-wrap justify-end gap-2">
       {creatorStatus === "PENDING" && (
-        <button
-          onClick={() => act("approveCreator")}
-          disabled={busy}
-          className="btn-primary !py-1.5 !text-xs"
-        >
-          Approve organizer
-        </button>
+        <>
+          <button
+            onClick={() => act("approveCreator")}
+            disabled={busy}
+            className="btn-primary !py-1.5 !text-xs"
+          >
+            Approve organizer
+          </button>
+          <button
+            onClick={() => act("declineCreator")}
+            disabled={busy}
+            className="btn-ghost !py-1.5 !text-xs text-ember-warm"
+          >
+            Decline
+          </button>
+        </>
       )}
       {role === "CREATOR" && (
         <button

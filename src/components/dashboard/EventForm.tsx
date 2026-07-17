@@ -35,6 +35,7 @@ export type EventFormValues = {
   commissionFee: string; // dollars per ticket (when FIXED)
   commissionPercent: string; // percent (when PERCENT)
   hideRemaining: boolean;
+  allowReverseCheckIn: boolean;
   consentRequirement: "NONE" | "UNDERAGE" | "ALL";
   consentFormUrl: string;
   ticketAccentColor: string;
@@ -62,6 +63,7 @@ const empty: EventFormValues = {
   commissionFee: "0",
   commissionPercent: "0",
   hideRemaining: false,
+  allowReverseCheckIn: false,
   consentRequirement: "NONE",
   consentFormUrl: "",
   ticketAccentColor: "#8b5cf6",
@@ -90,6 +92,9 @@ export function EventForm({
   const [v, setV] = useState<EventFormValues>(initial ?? empty);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Per-section save state (edit mode): which section is saving / just saved.
+  const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [savedSection, setSavedSection] = useState<string | null>(null);
 
   function set<K extends keyof EventFormValues>(
     key: K,
@@ -124,12 +129,9 @@ export function EventForm({
     setV((s) => ({ ...s, tiers: s.tiers.filter((_, idx) => idx !== i) }));
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const payload = {
+  // Full payload for the current form state. Section saves send a subset.
+  function buildPayload() {
+    return {
       title: v.title,
       category: v.category,
       description: v.description,
@@ -150,6 +152,7 @@ export function EventForm({
         Number(v.commissionPercent || "0") * 100,
       ),
       hideRemaining: v.hideRemaining,
+      allowReverseCheckIn: v.allowReverseCheckIn,
       consentRequirement: v.consentRequirement,
       consentFormUrl: v.consentFormUrl || undefined,
       ticketAccentColor: v.ticketAccentColor || undefined,
@@ -165,6 +168,38 @@ export function EventForm({
         color: t.color || undefined,
       })),
     };
+  }
+
+  // Save a single section independently (edit mode) via a partial PATCH.
+  async function saveSection(section: string, keys: string[]) {
+    if (!v.id) return;
+    setError("");
+    setSavingSection(section);
+    setSavedSection(null);
+    const full = buildPayload() as Record<string, unknown>;
+    const subset: Record<string, unknown> = {};
+    for (const k of keys) subset[k] = full[k];
+    const res = await fetch(`/api/creator/events/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subset),
+    });
+    const data = await res.json();
+    setSavingSection(null);
+    if (!res.ok) {
+      setError(data.error ?? "Could not save this section.");
+      return;
+    }
+    setSavedSection(section);
+    router.refresh();
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const payload = buildPayload();
 
     const url =
       mode === "create" ? "/api/creator/events" : `/api/creator/events/${v.id}`;
@@ -187,11 +222,49 @@ export function EventForm({
     router.refresh();
   }
 
+  // Renders a "Save section" button in a section header (edit mode only), so
+  // creators can update one part of a published event at a time.
+  function sectionAction(section: string, keys: string[]) {
+    if (mode !== "edit") return undefined;
+    return (
+      <button
+        type="button"
+        onClick={() => saveSection(section, keys)}
+        disabled={savingSection !== null}
+        className="btn-secondary !py-1.5 !text-xs"
+      >
+        {savingSection === section
+          ? "Saving…"
+          : savedSection === section
+            ? "Saved ✓"
+            : "Save section"}
+      </button>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="space-y-6">
       {error && <FormMessage type="error">{error}</FormMessage>}
+      {mode === "edit" && (
+        <p className="glass rounded-xl px-4 py-3 text-xs text-slate-300">
+          Edit any section on its own — use each section&apos;s{" "}
+          <span className="font-semibold text-white">Save section</span> button
+          to publish just that change, or{" "}
+          <span className="font-semibold text-white">Save changes</span> at the
+          bottom to update everything at once.
+        </p>
+      )}
 
-      <Section title="Event details">
+      <Section
+        title="Event details"
+        action={sectionAction("details", [
+          "title",
+          "category",
+          "capacity",
+          "description",
+          "coverImage",
+        ])}
+      >
         <Field label="Title">
           <input
             className="input"
@@ -257,7 +330,17 @@ export function EventForm({
         )}
       </Section>
 
-      <Section title="When & where">
+      <Section
+        title="When & where"
+        action={sectionAction("schedule", [
+          "startsAt",
+          "endsAt",
+          "venueName",
+          "address",
+          "mapUrl",
+          "ageRequirement",
+        ])}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Starts at">
             <input
@@ -312,7 +395,7 @@ export function EventForm({
         </Field>
       </Section>
 
-      <Section title="Ticket tiers">
+      <Section title="Ticket tiers" action={sectionAction("tiers", ["tiers"])}>
         <div className="space-y-4">
           {v.tiers.map((t, i) => (
             <div
@@ -422,7 +505,18 @@ export function EventForm({
         </button>
       </Section>
 
-      <Section title="Fees, consent & ticket style">
+      <Section
+        title="Fees, consent & ticket style"
+        action={sectionAction("fees", [
+          "commissionType",
+          "commissionFeeCents",
+          "commissionPercentBps",
+          "consentRequirement",
+          "consentFormUrl",
+          "ticketAccentColor",
+          "ticketNote",
+        ])}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Organizer commission">
             <div className="flex gap-2">
@@ -522,7 +616,16 @@ export function EventForm({
         </p>
       </Section>
 
-      <Section title="Policies">
+      <Section
+        title="Policies"
+        action={sectionAction("policies", [
+          "refundPolicy",
+          "refundsAllowed",
+          "transfersAllowed",
+          "hideRemaining",
+          "allowReverseCheckIn",
+        ])}
+      >
         <Field label="Refund policy">
           <textarea
             rows={2}
@@ -548,7 +651,16 @@ export function EventForm({
             checked={v.hideRemaining}
             onChange={(c) => set("hideRemaining", c)}
           />
+          <Toggle
+            label="Allow scanner staff to reverse a check-in"
+            checked={v.allowReverseCheckIn}
+            onChange={(c) => set("allowReverseCheckIn", c)}
+          />
         </div>
+        <p className="text-xs text-slate-500">
+          Reverse check-in lets a supervisor undo an accidental scan. It stays
+          off unless you enable it here.
+        </p>
       </Section>
 
       <div className="flex gap-3">
@@ -580,15 +692,20 @@ export function EventForm({
 function Section({
   title,
   children,
+  action,
 }: {
   title: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="glass-strong p-6">
-      <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-violetx-bright">
-        {title}
-      </h3>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-violetx-bright">
+          {title}
+        </h3>
+        {action}
+      </div>
       <div className="space-y-4">{children}</div>
     </div>
   );

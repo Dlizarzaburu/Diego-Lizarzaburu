@@ -22,7 +22,7 @@ export default async function ScannerEventPage({
   let canReverse = false;
   try {
     const access = await assertScannerAccess(eventId, user);
-    canReverse = access.canReverse;
+    canReverse = access.canReverse && event.allowReverseCheckIn;
   } catch {
     // Not authorized to scan this event.
     redirect("/scanner");

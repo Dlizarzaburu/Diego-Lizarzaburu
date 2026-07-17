@@ -7,16 +7,18 @@ import { formatDateTime } from "./format";
 // Unicode punctuation marks. Normalize common ones and drop anything outside
 // the encodable range so ticket PDFs never fail to generate.
 function clean(s: string): string {
-  return s
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[–—]/g, "-")
-    .replace(/…/g, "...")
-    .replace(/·/g, "-")
-    // Strip anything not representable in Latin-1 (emoji, etc.)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[^\x00-\xFF]/g, "")
-    .trim();
+  return (
+    s
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[–—]/g, "-")
+      .replace(/…/g, "...")
+      .replace(/·/g, "-")
+      // Strip anything not representable in Latin-1 (emoji, etc.)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[^\x00-\xFF]/g, "")
+      .trim()
+  );
 }
 
 function hexToRgb(hex?: string | null) {
@@ -48,20 +50,37 @@ export type TicketPdfData = {
 };
 
 /**
- * Build a single-page PDF ticket: S27 Events logo, party details, and a large
- * centered QR code. Personal data (name) is printed on the ticket, but never
- * inside the QR — the QR only carries the opaque token.
+ * Build a single-page Halloween-styled PDF ticket: circular S27 badge, party
+ * details, and a large QR "moon" framed in a circle. Personal data (name) is
+ * printed on the ticket, but never inside the QR — the QR only carries the
+ * opaque token. When the creator has disabled refunds/transfers, a prominent
+ * non-refundable / no-reselling notice is printed.
  */
 export async function buildTicketPdf(data: TicketPdfData): Promise<Uint8Array> {
   const W = 420;
-  const H = 620;
+  const H = 640;
   const doc = await PDFDocument.create();
   const page = doc.addPage([W, H]);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const accent = hexToRgb(data.accentColor);
+  const accentColor = rgb(accent.r, accent.g, accent.b);
+  const pumpkin = rgb(1, 0.46, 0.09); // #ff7518 Halloween orange
+  const white = rgb(0.95, 0.95, 0.97);
+  const muted = rgb(0.62, 0.64, 0.72);
 
-  // Background
+  const centered = (
+    text: string,
+    y: number,
+    size: number,
+    f = font,
+    color = white,
+  ) => {
+    const w = f.widthOfTextAtSize(text, size);
+    page.drawText(text, { x: (W - w) / 2, y, size, font: f, color });
+  };
+
+  // Dark background
   page.drawRectangle({
     x: 0,
     y: 0,
@@ -69,88 +88,112 @@ export async function buildTicketPdf(data: TicketPdfData): Promise<Uint8Array> {
     height: H,
     color: rgb(0.04, 0.04, 0.07),
   });
-  // Accent header band
-  page.drawRectangle({
-    x: 0,
-    y: H - 90,
-    width: W,
-    height: 90,
-    color: rgb(accent.r, accent.g, accent.b),
-  });
 
-  // Logo lockup
-  page.drawRectangle({
-    x: 28,
-    y: H - 66,
-    width: 42,
-    height: 42,
-    color: rgb(1, 1, 1),
-    opacity: 0.15,
+  // Decorative "confetti" circles (spooky dots) scattered around the edges.
+  const dots: Array<[number, number, number, ReturnType<typeof rgb>, number]> =
+    [
+      [40, H - 150, 6, pumpkin, 0.5],
+      [W - 46, H - 120, 9, accentColor, 0.45],
+      [W - 30, H - 210, 4, pumpkin, 0.6],
+      [24, H - 250, 5, accentColor, 0.5],
+      [W - 60, 250, 7, pumpkin, 0.4],
+      [34, 210, 5, accentColor, 0.5],
+      [W - 34, 150, 6, pumpkin, 0.5],
+      [50, 120, 4, accentColor, 0.5],
+    ];
+  for (const [x, y, s, c, o] of dots) {
+    page.drawCircle({ x, y, size: s, color: c, opacity: o });
+  }
+
+  // Circular S27 badge (logo lockup) — a circle, not a box.
+  page.drawCircle({ x: 52, y: H - 58, size: 24, color: pumpkin });
+  page.drawCircle({
+    x: 52,
+    y: H - 58,
+    size: 24,
+    borderColor: white,
+    borderWidth: 1.5,
   });
-  page.drawText("S27", {
-    x: 34,
-    y: H - 55,
-    size: 18,
-    font: bold,
-    color: rgb(1, 1, 1),
-  });
+  centeredIn(page, bold, "S27", 52, H - 63, 15, rgb(0.04, 0.04, 0.07));
   page.drawText("S27 EVENTS", {
-    x: 82,
-    y: H - 44,
+    x: 88,
+    y: H - 52,
     size: 18,
-    font: bold,
-    color: rgb(1, 1, 1),
-  });
-  page.drawText("Senior 2027", {
-    x: 82,
-    y: H - 62,
-    size: 10,
-    font,
-    color: rgb(1, 1, 1),
-  });
-
-  const white = rgb(0.95, 0.95, 0.97);
-  const muted = rgb(0.62, 0.64, 0.72);
-
-  // Event title (wrap to 2 lines if long)
-  const title = clean(data.eventTitle);
-  const titleSize = title.length > 26 ? 18 : 22;
-  page.drawText(title.length > 40 ? title.slice(0, 40) + "..." : title, {
-    x: 28,
-    y: H - 130,
-    size: titleSize,
     font: bold,
     color: white,
-    maxWidth: W - 56,
-    lineHeight: 22,
+  });
+  page.drawText("Senior 2027 - Halloween", {
+    x: 88,
+    y: H - 70,
+    size: 9,
+    font,
+    color: pumpkin,
   });
 
+  // Event title (centered, wraps if long)
+  const title = clean(data.eventTitle);
+  const titleSize = title.length > 24 ? 19 : 24;
+  centered(
+    title.length > 40 ? title.slice(0, 40) + "..." : title,
+    H - 108,
+    titleSize,
+    bold,
+    white,
+  );
+
+  // Tier "pill" — rounded (circle-capped) badge instead of a plain box.
+  const tierText = clean(data.tierName).toUpperCase();
+  const tierTextW = bold.widthOfTextAtSize(tierText, 9);
+  const pillW = tierTextW + 26;
+  const pillH = 20;
+  const pillX = (W - pillW) / 2;
+  const pillY = H - 138;
+  page.drawCircle({
+    x: pillX + pillH / 2,
+    y: pillY + pillH / 2,
+    size: pillH / 2,
+    color: accentColor,
+  });
+  page.drawCircle({
+    x: pillX + pillW - pillH / 2,
+    y: pillY + pillH / 2,
+    size: pillH / 2,
+    color: accentColor,
+  });
+  page.drawRectangle({
+    x: pillX + pillH / 2,
+    y: pillY,
+    width: pillW - pillH,
+    height: pillH,
+    color: accentColor,
+  });
+  centered(tierText, pillY + 6, 9, bold, rgb(1, 1, 1));
+
   // Details
-  let y = H - 170;
+  let y = H - 180;
   const row = (label: string, value: string) => {
     page.drawText(label.toUpperCase(), {
-      x: 28,
+      x: 40,
       y,
       size: 8,
       font: bold,
-      color: muted,
+      color: pumpkin,
     });
     page.drawText(clean(value), {
-      x: 28,
+      x: 40,
       y: y - 14,
       size: 12,
       font,
       color: white,
-      maxWidth: W - 56,
+      maxWidth: W - 80,
     });
-    y -= 40;
+    y -= 38;
   };
   row("When", formatDateTime(data.eventStartsAt));
   row("Where", `${data.venueName} - ${data.address}`);
   row("Ticket holder", data.holderName);
-  row("Tier", data.tierName);
 
-  // QR code — large, centered
+  // QR "moon": a white circle behind the square QR.
   const qrPng = await QRCode.toBuffer(data.qrToken, {
     errorCorrectionLevel: "M",
     margin: 1,
@@ -158,50 +201,59 @@ export async function buildTicketPdf(data: TicketPdfData): Promise<Uint8Array> {
     color: { dark: "#0a0a12", light: "#ffffff" },
   });
   const qrImage = await doc.embedPng(qrPng);
-  const qrSize = 190;
-  const qrX = (W - qrSize) / 2;
-  const qrY = 96;
-  // White card behind the QR
-  page.drawRectangle({
-    x: qrX - 12,
-    y: qrY - 12,
-    width: qrSize + 24,
-    height: qrSize + 24,
-    color: rgb(1, 1, 1),
+  const qrSize = 168;
+  const cx = W / 2;
+  const cy = 168;
+  // Outer glow ring + white moon
+  page.drawCircle({
+    x: cx,
+    y: cy,
+    size: qrSize / 2 + 26,
+    color: pumpkin,
+    opacity: 0.18,
   });
-  page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-
-  // Ticket code (centered)
-  const codeWidth = bold.widthOfTextAtSize(data.code, 13);
-  page.drawText(data.code, {
-    x: (W - codeWidth) / 2,
-    y: qrY - 30,
-    size: 13,
-    font: bold,
-    color: rgb(accent.r, accent.g, accent.b),
+  page.drawCircle({ x: cx, y: cy, size: qrSize / 2 + 16, color: rgb(1, 1, 1) });
+  page.drawImage(qrImage, {
+    x: cx - qrSize / 2,
+    y: cy - qrSize / 2,
+    width: qrSize,
+    height: qrSize,
   });
 
-  // Note + policy footer
-  const footerLines: string[] = [];
-  if (data.note) footerLines.push(clean(data.note));
-  footerLines.push(
-    clean(
-      `${data.refundsAllowed ? "" : "Non-refundable - "}${data.transfersAllowed ? "" : "No resale/transfer - "}Scan once at entry`,
-    ),
-  );
-  let fy = 54;
-  for (const line of footerLines) {
-    const wtxt = font.widthOfTextAtSize(line, 8);
-    page.drawText(line, {
-      x: (W - wtxt) / 2,
-      y: fy,
-      size: 8,
-      font,
-      color: muted,
-      maxWidth: W - 40,
-    });
-    fy -= 14;
+  // Ticket code (centered, accent)
+  centered(data.code, cy - qrSize / 2 - 28, 13, bold, accentColor);
+
+  // Optional note from the creator
+  let fy = 70;
+  if (data.note) {
+    centered(clean(data.note), fy, 8, font, muted);
+    fy -= 16;
   }
 
+  // Prominent non-refundable / no-reselling notice (creator-controlled via the
+  // event's refund/transfer settings).
+  const warnings: string[] = [];
+  if (!data.refundsAllowed) warnings.push("NON-REFUNDABLE TICKET");
+  if (!data.transfersAllowed) warnings.push("NO RESELLING / NO TRANSFERS");
+  if (warnings.length > 0) {
+    centered(warnings.join("  -  "), fy, 10, bold, pumpkin);
+    fy -= 16;
+  }
+  centered("Scan once at entry - Senior 2027", fy, 8, font, muted);
+
   return doc.save();
+}
+
+// Draw text horizontally centered on a given x anchor.
+function centeredIn(
+  page: import("pdf-lib").PDFPage,
+  f: import("pdf-lib").PDFFont,
+  text: string,
+  cx: number,
+  y: number,
+  size: number,
+  color: ReturnType<typeof rgb>,
+) {
+  const w = f.widthOfTextAtSize(text, size);
+  page.drawText(text, { x: cx - w / 2, y, size, font: f, color });
 }

@@ -146,6 +146,9 @@ model Event {
   // Hide the remaining-ticket counts from customers.
   hideRemaining Boolean @default(false)
 
+  // Whether scanner supervisors may reverse a check-in for this event.
+  allowReverseCheckIn Boolean @default(false)
+
   // Consent form: require attendees to agree to an uploaded form.
   consentRequirement ConsentRequirement @default(NONE)
   consentFormUrl     String?
@@ -331,6 +334,14 @@ model AuditLog {
 
   @@index([actorId])
   @@index([action])
+}
+
+model BoardMember {
+  id        String   @id @default(cuid())
+  name      String
+  photoUrl  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model PlatformSetting {

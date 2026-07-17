@@ -67,6 +67,7 @@ export const eventInputSchema = z.object({
   commissionFeeCents: z.number().int().min(0).max(100_00).optional(),
   commissionPercentBps: z.number().int().min(0).max(10000).optional(),
   hideRemaining: z.boolean().optional(),
+  allowReverseCheckIn: z.boolean().optional(),
   consentRequirement: z.enum(["NONE", "UNDERAGE", "ALL"]).optional(),
   consentFormUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
   ticketAccentColor: z
@@ -78,6 +79,10 @@ export const eventInputSchema = z.object({
   ticketNote: z.string().trim().max(200).optional().or(z.literal("")),
   tiers: z.array(tierInputSchema).min(1, "Add at least one ticket tier"),
 });
+
+// Partial update for editing a single section of a published event.
+// All keys optional; only the provided fields are updated.
+export const partialEventSchema = eventInputSchema.partial();
 
 export const checkoutSchema = z.object({
   eventId: z.string().min(1),
@@ -124,4 +129,5 @@ export const transferSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type EventInput = z.infer<typeof eventInputSchema>;
+export type PartialEventInput = z.infer<typeof partialEventSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;

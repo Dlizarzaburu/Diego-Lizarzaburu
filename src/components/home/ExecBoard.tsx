@@ -1,21 +1,34 @@
 import { Reveal } from "@/components/Reveal";
 import { BoardAvatar } from "@/components/home/BoardAvatar";
+import { prisma } from "@/lib/prisma";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Senior 2027 executive board (order matches the request).
-// Photos load from /public/board/<file>. Until those image files exist, an
-// elegant gradient monogram is shown automatically. To add the photos: put
-// andrea.jpg, angelina.jpg, diego.jpg, mariana.jpg, lucia.jpg in public/board/.
+// Senior 2027 executive board. Members and their photo URLs are managed from
+// the admin portal (/admin/board). Photo URLs may point anywhere (e.g. a
+// hosted image link); if a photo is missing, an elegant gradient monogram is
+// shown automatically. The defaults below are used only if no members exist.
 // ─────────────────────────────────────────────────────────────────────────────
 type Member = { name: string; role?: string; photo: string };
 
-const BOARD: Member[] = [
+const DEFAULT_BOARD: Member[] = [
   { name: "Andrea Jaen", photo: "/board/andrea.jpg" },
   { name: "Angelina Calvo", photo: "/board/angelina.jpg" },
   { name: "Diego Lizarzaburu", photo: "/board/diego.jpg" },
   { name: "Mariana Diaz", photo: "/board/mariana.jpg" },
   { name: "Lucia Lizarzaburu", photo: "/board/lucia.jpg" },
 ];
+
+async function loadBoard(): Promise<Member[]> {
+  try {
+    const rows = await prisma.boardMember.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+    if (rows.length === 0) return DEFAULT_BOARD;
+    return rows.map((r) => ({ name: r.name, photo: r.photoUrl ?? "" }));
+  } catch {
+    return DEFAULT_BOARD;
+  }
+}
 
 function initials(name: string) {
   return name
@@ -26,7 +39,8 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export function ExecBoard() {
+export async function ExecBoard() {
+  const BOARD = await loadBoard();
   return (
     <section className="relative overflow-hidden py-20">
       <div className="absolute inset-0 bg-grid-glow opacity-40" />
